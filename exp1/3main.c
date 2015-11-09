@@ -24,12 +24,8 @@ int main(int argc,char **argv)
 	}
 	return 0;
 }
-//asm zhong buneng yong precode
+//ä¸èƒ½å†å†…è”æ±‡ç¼–ä¸­ä½¿ç”¨ä¼ªä»£ç 
 //	printf("sum(100) = %d",sum(i));
-
-	//ÓÃ _emit ¶¨Òå×Ö½Ú¡£Èç£º
-//_asm _emit 0x90
-//»ò
 //_asm
 //{
 //    _emit 0x90

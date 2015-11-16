@@ -2,7 +2,7 @@
 
 struct ctx {
   int eip, esp, ebx, ebp;
-} M, A;
+} M, A, B;
 
 __declspec(naked) void swtch(struct ctx *from, struct ctx *to)
 {
@@ -27,39 +27,37 @@ __declspec(naked) void swtch(struct ctx *from, struct ctx *to)
 
 void taskA()
 {
-    printf("A: 1\n");
-    swtch(&A, &M);
-    printf("A: 2\n");
-    swtch(&A, &M);
-    printf("A: 3\n");
-    swtch(&A, &M);
-    printf("A: 4\n");
-    swtch(&A, &M);
-    printf("A: 5\n");
-    swtch(&A, &M);
-    printf("A: 6\n");
-    swtch(&A, &M);
-    printf("A: 7\n");
-    swtch(&A, &M);
+  int i;
+  for(i=1;i<=10;i++)
+  {
+     printf("A: %d\n",i);
+      swtch(&A, &B);
+  }
 }
-
+void taskB()
+{
+   int i;
+  for(i=1;i<=10;i++)
+  {
+     printf("B: %d\n",i);
+     swtch(&B, &M);
+  }
+}
 int main()
 {
   int stackA[1024];
-  
+  int stackB[1024];
   A.eip = (int)taskA;
+  B.eip = (int)taskB;
   A.esp = (int)(&stackA[1023]);
-  swtch(&M, &A);
-  printf("M:       1\n");
-  swtch(&M, &A);
-  printf("M:       2\n");
-  swtch(&M, &A);
-  printf("M:       3\n");
-  swtch(&M, &A);
-  printf("M:       4\n");
-  swtch(&M, &A);
-  printf("M:       5\n");
-  swtch(&M, &A);
-  printf("M:       6\n");
+  B.esp = (int)(&stackB[1023]);
+  
+  
+   int i;
+  for(i=1;i<=10;i++)
+  {
+     swtch(&M, &A);
+     printf("C: %d\n\n",i);
+  }
   return 0;
 }

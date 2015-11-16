@@ -28,16 +28,18 @@ __declspec(naked) void swtch(struct ctx *from, struct ctx *to)
 void taskA()
 {
   int i;
-  for(i=1;i<=10;i++)
+  for(i=1;i<=9;i++)
   {
      printf("A: %d\n",i);
       swtch(&A, &B);
   }
+  printf("A: %d\n",i);
+  swtch(&A,&M);
 }
 void taskB()
 {
    int i;
-  for(i=1;i<=10;i++)
+  for(i=1;i<=9;i++)
   {
      printf("B: %d\n",i);
      swtch(&B, &M);
@@ -54,10 +56,12 @@ int main()
   
   
    int i;
-  for(i=1;i<=10;i++)
+  for(i=1;i<=8;i++)
   {
      swtch(&M, &A);
      printf("C: %d\n\n",i);
   }
+  swtch(&M, &A);
+  swtch(&M, &A);
   return 0;
 }

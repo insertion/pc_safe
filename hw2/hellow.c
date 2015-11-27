@@ -16,8 +16,9 @@ int WINAPI WinMain(HINSTANCE hInstance,
     while (showmsg(buf))
 	{
         sprintf(buf, "base=0x%08x\n pid=%d\n %s", 
-           (unsigned int) hInstance, pid, s);
+           (unsigned int) hInstance, &i, s);
         i++;
+       // printf("i 的地址%p",&i);
     }
     return 0;				   
 }

@@ -1,0 +1,8 @@
+
+_main:
+  00000003: EB 08              jmp         0000000D
+  00000005: B8 BB AA BB AA     mov         eax,0AABBAABBh
+  0000000A: FF D0              call        eax
+  0000000C: C3                 ret
+  0000000D: E8 F3 FF FF FF     call        00000005
+

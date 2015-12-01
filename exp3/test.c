@@ -32,10 +32,10 @@ int i=(int)MessageBoxA;
  
 void main()
 {
-  //code[10]= (i)     &255;
-  //code[11]= (i>>8)  &255;
-  //code[12]= (i>>16) &255;
-  //code[13]= (i>>24) &255;
+  code[10]= (i)     &255;
+  code[11]= (i>>8)  &255;
+  code[12]= (i>>16) &255;
+  code[13]= (i>>24) &255;
 	int op;
 	VirtualProtect(&code[0],27,PAGE_EXECUTE_READWRITE,&op);
 	__asm

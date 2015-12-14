@@ -38,9 +38,11 @@ DWORD GetIAFromImportTable(DWORD dwBase, LPCSTR lpszFuncName)
  /*4*/   DWORD dwRVAImpTbl = pOptHeader->DataDirectory[1].VirtualAddress;
  /*5*/   PIMAGE_IMPORT_DESCRIPTOR pImpTbl =( PIMAGE_IMPORT_DESCRIPTOR) ((DWORD)dwBase + dwRVAImpTbl);
  return GetIAFromImpDesc(dwBase,lpszFuncName,pImpTbl);
-}
-    char *s="hello";
-    char *h="l'm hacked";
+ }
+ 
+ 
+ 
+char *h="l'm hacked";
 __declspec(naked) MyMessageBoxA()
 {
     //MessageBoxA(NULL, "l'm hackded!", "msg", MB_OK);
@@ -48,10 +50,12 @@ __declspec(naked) MyMessageBoxA()
      __asm
     {
         mov eax,h
-        mov [esp+12],eax
+        mov [esp+8],eax
+        //[esp]是ret，[esp+4]是0,esp指向栈顶保存的值
+        //push 5 ==> add esp,4;mov esp,5
         //修改第二个参数为l'm hacked
         jmp addr
-        //这里栈平衡非常重要
+        //这里栈平衡非常重要，用jmp比call简单
     }
 }
 
@@ -73,5 +77,6 @@ void main()
      (*entryPoint)=(int)MyMessageBoxA;
      // printf("[2]:function entryPoint is %08p ==>0x%08x\n",MyMessageBoxA,*MyMessageBoxA);
      // MyMessageBoxA();
-     MessageBoxA(NULL, "hello", "msg", MB_OK);
+     MessageBoxA(NULL, "happyday", "hello", MB_OK);
+     printf("[2]:is done!\n");
 } 

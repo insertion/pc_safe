@@ -379,6 +379,7 @@ int inject_code(DWORD pid)
         GetExitCodeThread(hThread, (PDWORD) &exitcode);
         printf(">exitcode is 0x%08x\n",exitcode);
        // VirtualFreeEx(hproc, pRemoteThread, 0, MEM_RELEASE);
+       //这里不能释放开辟出来的空间，我们的mymessagebox还在空间内
         if (!CloseHandle(hproc)) 
         {
         printf("[E]: Process (%d) cannot be closed !\n", pid);

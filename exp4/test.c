@@ -71,9 +71,9 @@ void main()
      }
      else
       printf("[1]:MessageBoxA entryPoint is %08p ==>0x%08x\n",entryPoint,*entryPoint);
-     
+          addr=*entryPoint;
      VirtualProtect(entryPoint,4,PAGE_EXECUTE_READWRITE,&op);
-     addr=*entryPoint;
+    // addr=*entryPoint;
      (*entryPoint)=(int)MyMessageBoxA;
      // printf("[2]:function entryPoint is %08p ==>0x%08x\n",MyMessageBoxA,*MyMessageBoxA);
      // MyMessageBoxA();

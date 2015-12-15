@@ -5,8 +5,8 @@ int main()
 {
     char buff[20];
     int pid = GetCurrentProcessId();
-    sprintf(buff, "pid=%d\n",pid );
-    while (MessageBoxA(0,buff, "hello.exe", MB_YESNO) == IDYES) {}
+    printf("[MessageBoxA]:pid is %d\n",pid);
+    while (MessageBoxA(0,"happy", "hello.exe", MB_YESNO) == IDYES) {}
     return 0;
 }
 

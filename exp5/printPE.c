@@ -17,6 +17,59 @@ WORD  wSecNum;
 PBYTE pSecData[MAX_SECTION_NUM];
 DWORD dwSecSize[MAX_SECTION_NUM];
 DWORD dwFileSize;
+DWORD dwSizeOfCode ;
+PBYTE pRemoteCode, pCode, pOrignCode;
+void code();
+void code_end();
+__declspec(naked) void code()
+{
+    __asm {
+        pushad                        //PUSHAD指令压入32位寄存器，其入栈顺序是:EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI 
+        call    _delta
+_delta:
+        pop     ebx                         // save registers context from stack
+        sub     ebx, offset _delta
+
+        mov     eax, 0x00400000
+        add     eax,dword ptr [ebx + _addr_orign_aoep]
+        mov     dword ptr [esp + 0x1C], eax     // save (dwBaseAddress + orign) to eax-location-of-context
+        popad                                   // load registers context from stack
+        push    eax
+        xor     eax, eax
+        retn                                    // >> jump to the Original AOEP
+_addr_orign_aoep:
+        _emit   0x4b
+        _emit   0x15
+        _emit   0x00
+        _emit   0x00
+    }
+}
+__declspec(naked) void code_end()
+{
+    __asm _emit 0xBB
+}
+// make_code()函数是将开始标记code_start和结束标记code_end之间的所有二进制数据拷贝到一个缓冲区中
+DWORD make_code()
+{
+    int off; 
+    __asm {
+        mov edx, offset code
+        mov dword ptr [pOrignCode], edx
+        mov eax, offset code_end
+        sub eax, edx
+        mov dword ptr [dwSizeOfCode], eax
+    }
+    pCode = VirtualAlloc(NULL, dwSizeOfCode, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+    if (pCode== NULL) {
+        printf("[E]: VirtualAlloc failed\n");
+        return 0;
+    }
+    for (off = 0; off<dwSizeOfCode; off++) {
+        *(pCode+off) = *(pOrignCode+off);
+    }
+   // *(PDWORD)((PBYTE)_addr_orign_aoep-(DWORD)pOrignCode+(DWORD)pCode) = pOptHeader->AddressOfEntryPoint;
+    return dwSizeOfCode;
+}
 static DWORD PEAlign(DWORD dwTarNum,DWORD dwAlignTo)
 {	
     //对齐处理
@@ -24,8 +77,6 @@ static DWORD PEAlign(DWORD dwTarNum,DWORD dwAlignTo)
 }
 /******************************************************************/
 WORD  wInjSecNo;
-//DWORD dwSizeOfCode = 0x4;
-BYTE pCode[] ={0xCC, 0xCC, 0xCC, 0xCC};
 BOOL AddNewSection()
 {
    // printf("sizeof code%d\n",sizeof(pCode));
@@ -50,10 +101,10 @@ BOOL AddNewSection()
     //先添加section头
 
     // 请填入代码
-     rsize =PEAlign(sizeof(pCode),pOptHeader->FileAlignment) ;
+     rsize =PEAlign(dwSizeOfCode,pOptHeader->FileAlignment) ;
 
     // 请填入代码
-     vsize = sizeof(pCode);
+     vsize = dwSizeOfCode;
      //vsize应该是section未对齐前的实际尺寸,且只有在为数据段时比对齐后的磁盘大小大，因为为初始化的数据只有在内存中才会分配空间
 
     roffset = PEAlign(pSecHeader[wInjSecNo-1]->PointerToRawData + pSecHeader[wInjSecNo-1]->SizeOfRawData,
@@ -81,7 +132,7 @@ BOOL AddNewSection()
     //分配的大小应该是对齐后的物理大小
     dwSecSize[wInjSecNo] = pSecHeader[wInjSecNo]->SizeOfRawData;
     //这个值和rsize实际上时相等的
-    CopyMemory(pSecData[wInjSecNo], pCode, sizeof(pCode));
+    CopyMemory(pSecData[wInjSecNo], pCode, dwSizeOfCode);
     wSecNum++;
     pFileHeader->NumberOfSections = wSecNum;
     //section数++
@@ -355,12 +406,13 @@ BOOL CopyMen2File(LPCSTR pName)
 int main()
 {
     LPCSTR lpszFileName = "hello.exe";
-    LPCSTR lpszInjFileName = "hello_inj0.exe";
+    LPCSTR lpszInjFileName = "hello_inj.exe";
     
     hHeap = GetProcessHeap();
     if (! CopyPEFileToMem(lpszFileName)) {
         return 1;
     }
+    make_code();
     AddNewSection();
     OutputPEInMem();
      if (! CopyMen2File(lpszInjFileName)) {

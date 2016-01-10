@@ -30,3 +30,6 @@
 *.exp
 # Debug files
 *.dSYM/
+GPATH
+GRTAGS
+GTAGs

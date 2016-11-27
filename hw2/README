@@ -1,0 +1,76 @@
+##############################################
+作业提交注意事项：
+<A> 提交作业只提交源代码文件与带有编译链接命令
+的.bat文件。提交文件中不能含有任何 .obj, .exe等
+编译产生的中间文件。
+<B> 提交作业请将全部文件打包(rar或者zip格式)，
+并且打包文件请按照 "学号-姓名.rar" 或者 
+"学号-姓名.zip"的方式命名。
+<C> 对作业有何疑问之处，请在作业截止日期前发邮
+件到 guoyu@ustc.edu.cn 咨询。
+<D> 如果发现作业有抄袭行为，主动抄袭与被动抄袭
+一方均按零分计算。
+<E> 每次作业满分5分。
+<F> 鼓励大家在提交的代码中加入有助于理解的注释。
+##############################################
+
+
+请看下面的hellow.c文件
+=======BEGIN==={hellow.c}=====
+
+#include <windows.h>
+
+
+__declspec(dllimport) int ShowMsg(char *s);
+
+char *s = "Hello world!";
+int i=0;
+char buf[100];
+
+int WINAPI WinMain(HINSTANCE hInstance, 
+                   HINSTANCE hPrevInstance, 
+                   LPSTR lpCmdLine, 
+                   int nCmdShow)
+{
+    int pid = 0;
+    pid = GetCurrentProcessId();
+    while (ShowMsg(buf)){
+     sprintf(buf, "base=0x%08x\npid=%d\n%s", 
+            hInstance, pid, s);
+        i++;
+    }
+    return 0;
+}
+=======END==={hellow.c}=======
+
+=======BEGIN==={msg.c}=====
+#include <windows.h>
+    
+__declspec(dllexport) int ShowMsg(char* s)
+{
+   if (MessageBoxA(0, s, "Message", MB_YESNO) == IDYES)
+ return 1;
+   else 
+        return 0;
+}
+=======END==={msg.c}=======
+
+作业[1]:
+(1) 请编译链接生成msg.dll:
+(2) 请编译链接生成hellow.exe文件:
+(3) 运行hellow.exe，显示hellow.exe的程序基址与进程ID
+
+作业[2]:
+(1) 如果删除 hellow.c 中的 __declspec(dllimport)，编译链接过程是否会出错。
+如果出错，需要如何修正。请将答案以程序注释的形式给出。
+(2) 如果删除 msg.c 中的 __declspec(dllexport)，编译链接过程是否会出错。
+如果出错，需要如何修正。请将答案以程序注释的形式给出。
+
+作业[3]:
+(1) 请改写msg.c，将msg.c中弹出对话框的标题栏字符“Message”
+替换为hellow.exe程序的加载地址（比如："base = 0xXXXXYYYY"）。
+(2) 请编译链接产生新的msg.dll，并且成功运行hellow.exe。
+[提示]
+(*) 在msg.dll中难以直接得到WinMain函数的参数。但是可以
+通过调用 GetModuleHandleA(0) 这个系统API函数来获取当前进程中
+的.exe模块的基址。

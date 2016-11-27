@@ -1,0 +1,196 @@
+##############################################
+作业提交注意事项：
+<A> 提交作业只提交源代码文件与带有编译链接命令
+的.bat文件。提交文件中不能含有任何 .obj, .exe等
+编译产生的中间文件。
+<B> 提交作业请将全部文件打包(rar或者zip格式)，
+并且打包文件请按照 "学号-姓名.rar" 或者 
+"学号-姓名.zip"的方式命名。
+<C> 对作业有何疑问之处，请在作业截止日期前发邮
+件到 guoyu@ustc.edu.cn 咨询。
+<D> 如果发现作业有抄袭行为，主动抄袭与被动抄袭
+一方均按零分计算。
+<E> 每次作业满分5分。
+<F> 鼓励大家在提交的代码中加入有助于理解的注释。
+##############################################
+
+
+请看下面的hellow.c文件
+=======BEGIN==={hellow.c}=====
+#include <windows.h>
+
+__declspec(dllimport) int ShowMsg(char *s);
+
+char *s = "Hello world!";
+int i=0;
+char buf[100];
+
+
+int WINAPI WinMain(HINSTANCE hInstance, 
+                   HINSTANCE hPrevInstance, 
+                   LPSTR lpCmdLine, 
+                   int nCmdShow)
+{
+    int pid = 0;
+    pid = GetCurrentProcessId();
+    while (ShowMsg(buf)){
+     sprintf(buf, "base=0x%08x\npid=%d\n%s", 
+            hInstance, pid, s);
+        i++;
+    }
+    return 0;
+}
+=======END==={hellow.c}=======
+
+
+=======BEGIN==={msg.c}=====
+#include <windows.h>
+
+#pragma comment(lib, "user32.lib")
+    
+__declspec(dllexport) int ShowMsg(char* s)
+{
+   if (MessageBoxA(0, s, "Message", MB_YESNO) == IDYES)
+ return 1;
+   else 
+        return 0;
+}
+=======END==={msg.c}=======
+
+
+请再看下面的hack.c文件
+=======BEGIN=={hack.c}======
+#include <windows.h>
+
+int main(int argc, char *argv[])
+{
+    int pid = 0;
+    HANDLE hproc = 0;
+    char *s = "I'm hacked";
+
+    // YOU MAY NEED MORE LOCAL VARIABLES
+    // PLEASE ADD THEM HERE
+
+    if (argc < 2) {
+        printf("Usage: %s pid\n", argv[0]);
+        return -1;
+    }
+    pid = atoi(argv[1]);
+    if (pid <= 0) {
+        printf("[E]: pid must be positive (pid>0)!\n"); 
+        return -2;
+    }
+
+    hproc = OpenProcess(PROCESS_CREATE_THREAD 
+        | PROCESS_QUERY_INFORMATION
+        | PROCESS_VM_OPERATION 
+        | PROCESS_VM_WRITE 
+        | PROCESS_VM_READ,
+        FALSE, pid);
+
+
+// FILL YOUR CODE HERE
+
+
+    if (!CloseHandle(hproc)) {
+        printf("[E]: Process (%d) cannot be closed !\n", pid);
+        return 2;
+    };
+    printf("[I]: Process (%d) is closed. \n", pid);
+    return 0;
+}
+=======END==={hack.c}=======
+
+
+作业[1]:
+(1) 请按照下列要求生成msg.dll:
+  > cl /c msg.c
+  > link /DLL /DYNAMICBASE msg.obj
+(2) 请按照下列要求编译链接生成hellow.exe文件:
+  > cl /c hellow.c
+  > link /DYNAMICBASE:no /BASE:0x00400000 hellow.obj msg.lib
+(3) 运行hellow.exe，确保程序能够正常工作.
+(4) 请填写代码模板hack.c，编译生成hack1.exe可以得到
+hellow.exe进程中的变量i的值。
+[提示]
+(*)请通过ollydbg观察得到变量i的地址。
+(*)请通过远程读取(ReadProcessMemory)来读取变量i的值。
+
+
+作业[2]:
+(1) 请填写代码模板hack.c，生成hack2.exe，完成功能:
+将字符串"I'm hacked" 动态注入到运行进程hellow.exe中，
+使得弹出窗口中原来显示的"Hello world!"字串的
+内容更改为"I'm hacked"字符串。
+[提示]
+(*)请通过ollydbg观察得到变量s与buf的地址。
+(*)请使用远程写入API(WriteProcessMemory)，来覆盖
+这个字符串。
+
+
+作业[3]:
+(1) 请按照下列要求重新编译链接生成hellow.exe文件:
+  > cl /c hellow.c
+  > link /BASE=0x02000000 hellow.obj msg.lib
+(2) 请填写代码模板hack.c，生成hack3.exe完成如下功能:
+将一段code注入到hellow.exe进程中，并创建一个远程
+线程执行之，code运行结束后将hellow.exe的基地址返回
+给hack3.exe，并打印。
+[提示]
+(*) 可以在hellow.exe中注入下面的代码，它通过执行
+GetModuleHandleA(0)系统API函数来获取当前进程中的.exe
+模块基地址。
+=======BEGIN========
+   push 0
+   mov  eax, 0xAABBAABB // 
+   call eax
+   ret
+=======END==========
+
+
+(*)考虑到GetModuleHandleA的入口地址在不同的系统中的地址是
+不相同的，我们先假设这个地址为0xAABBAABB。但又因为GetModuleHandleA
+函数属于系统核心库kernel32.dll，它的入口地址在同一个系统的
+不同进程中的入口地址均相同，因此我们可以在hack3.exe注
+入代码之前，将这段代码字符数组中的0xAABBAABB替换成hack3.exe
+进程中GetModuleHandleA的入口地址。然后再将修改过后的code数组
+注入到hellow.exe进程中，运行并返回hellow.exe的基地址。
+
+
+(*)下面是GetModuleHandleA(0)函数调用代码的二进制编码供参考:
+=======BEGIN========
+BYTE code[]={0x6a,0x00,0xb8,
+    0xbb,0xaa,0xbb,0xaa, //0xAABBAABB
+    0xff,0xd0,0xc3};
+=======END==========
+
+作业[4]
+(1)请填写hack.c，使得生成的hack4.exe将"Hacked"这个字符串写入
+hellow.exe的进程空间中，使得弹出窗口的标题栏内容("Message")变成
+"Hacked"字串。
+(2)假如将msg.dll替换成一个BaseAddress未知的msg.dll(该msg.dll
+仍然是由msg.c编译链接生成，但是新msg.dll的运行基地址未知，
+或者这个msg.dll是动态基址)。
+为了使得hack4.exe仍然能够成功修改弹出窗口的标题栏，请继续修改
+hack.c，实现此功能。
+
+[难点提示]: 
+
+(*)修改标题栏，需要找到"Message"字符串，这一字符串放在msg.dll的.data节中。
+
+要先找到msg.dll 在hellow.exe进程中的基址，然后根据.data节的偏移，从而找
+
+到"Message"字符串的地址并修改字符串内容。
+(*)由于msg.dll的内存基地址是动态的，那么在修改msg.dll中的内容之前，
+最重要的步骤就是先得到这个msg.dll的基地址。得到基地址的方法有很多，
+例如可以通过远程注入代码执行LoadLibraryA("msg.dll")的方式。
+(*)调用LoadLibraryA()函数需要一个字符串参数"msg.dll"。那么如何在
+hellow.exe进程中找到msg.dll的这个字符串成为这个步骤的关键。事实上
+我们可以在hellow.exe的.rdata节中找到这一字符串。
+(*)下面参考步骤：
+<1>通过ollydbg来找到这一个字符串的地址，
+<2>正确生成类似作业[3]中的二进制编码
+<3>将代码注入到hellow.exe执行，得到msg.dll的基址后通过远程线程把结果返回到hack4.exe
+<4>然后hack4.exe再根据msg.dll中"Message"字符串的偏移，来得到"Message"的地址
+<5>再次写入hellow.exe，修改"Message"字符串
+只是参考，作业[4]也可以采用别的方法，只要符合要求即可

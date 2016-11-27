@@ -1,0 +1,61 @@
+##############################################
+作业提交注意事项：
+<A> 提交作业只提交源代码文件与带有编译链接命令
+的.bat文件。提交文件中不能含有任何 .obj, .exe等
+编译产生的中间文件。
+<B> 提交作业请将全部文件打包(rar或者zip格式)，
+并且打包文件请按照 "学号-姓名.rar" 或者 
+"学号-姓名.zip"的方式命名。
+<C> 对作业有何疑问之处，请在作业截止日期前发邮
+件到 guoyu@ustc.edu.cn 咨询。
+<D> 如果发现作业有抄袭行为，主动抄袭与被动抄袭
+一方均按零分计算。
+<E> 每次作业满分5分。
+<F> 鼓励大家在提交的代码中加入有助于理解的注释。
+##############################################
+
+
+
+
+请看下面的hello.c文件
+=======BEGIN==={hello.c}=====
+#include <windows.h>
+
+__declspec(dllimport) int ShowMsg(char *s);
+
+char *s = "Hello world!";
+
+int main()
+{
+    ShowMsg(s);
+    // FILL YOUR CODE HERE
+    return 0;
+}
+=======END==={hello.c}=======
+
+
+=======BEGIN==={msg.c}=====
+#include <windows.h>
+
+#pragma comment(lib, "user32.lib")
+    
+__declspec(dllexport) int ShowMsg(char* s)
+{
+
+   if (MessageBoxA(0, s, "Message", MB_YESNO) == IDYES)
+
+        return 1;
+   else 
+        return 0;
+}
+=======END==={msg.c}=======
+
+
+请按照下列要求生成msg.dll:
+  > cl /c msg.c
+  > link /DLL msg.obj
+
+作业：
+
+请在hello.c中加入代码，打印msg.dll 的导入表(Import Table)，即msg.dll所导入的所有函数的名称，
+所在dll 的名称，以及入口地址。
